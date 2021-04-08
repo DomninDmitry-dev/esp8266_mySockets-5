@@ -28,10 +28,7 @@
 #include <lwip/dns.h>
 
 #include <ssid_config.h>
-
-/* Add extras/sntp component to makefile for this include to work */
-#include <sntp.h>
-#include <time.h>
+#include "espressif/user_interface.h"
 
 #define CALLBACK_DEBUG
 
@@ -40,9 +37,6 @@
 #else
 #define debug(s, ...)
 #endif
-
-#define SNTP_SERVERS 	"0.ua.pool.ntp.org", "1.ua.pool.ntp.org", \
-						"2.ua.pool.ntp.org", "3.ua.pool.ntp.org"
 
 #define vTaskDelayMs(ms)	vTaskDelay((ms)/portTICK_PERIOD_MS)
 #define UNUSED_ARG(x)	(void)x
@@ -157,35 +151,28 @@ static void scan_done_cb(void *arg, sdk_scan_status_t status)
     }
 }
 
-static void telnetTask(void *pvParameters)
+static void socketsTask(void *pvParameters)
 {
-//	const char *servers[] = {SNTP_SERVERS};
 	uint8_t status  = 0;
-
 	UNUSED_ARG(pvParameters);
-
 	struct netconn *nc = NULL; // To create servers
-
-	set_tcp_server_netconn(&nc, ECHO_PORT_1, netCallback);
-	debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_1);
-	//set_tcp_server_netconn(&nc, ECHO_PORT_2, netCallback);
-	//debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_2);
-
 	struct netbuf *netbuf = NULL; // To store incoming Data
 	struct netconn *nc_in = NULL; // To accept incoming netconn
-	//
 	char buf[50];
 	char* buffer;
 	uint16_t len_buf;
 	netconn_events events;
-
-	struct ip_info static_ip_info = {0};
-
+	struct ip_info static_ip_info;
 	struct sdk_station_config config = {
 		.ssid = WIFI_SSID,
 		.password = WIFI_PASS,
 		.bssid_set = 0
 	};
+
+	set_tcp_server_netconn(&nc, ECHO_PORT_1, netCallback);
+	debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_1);
+	//set_tcp_server_netconn(&nc, ECHO_PORT_2, netCallback);
+	//debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_2);
 
 	debug("ssid: %s\n", config.ssid);
 	debug("password: %s\n", config.password);
@@ -195,7 +182,7 @@ static void telnetTask(void *pvParameters)
 	vTaskDelay(500);
 	sdk_wifi_station_dhcpc_stop();
 	debug("dhcp status : %d", sdk_wifi_station_dhcpc_status());
-	IP4_ADDR(&static_ip_info.ip, 192, 168, 0 ,133);
+	IP4_ADDR(&static_ip_info.ip, 192, 168, 0 ,200);
 	IP4_ADDR(&static_ip_info.gw, 192, 168, 0, 1);
 	IP4_ADDR(&static_ip_info.netmask, 255, 255, 255, 0);
 	debug("static ip set status : %d", sdk_wifi_set_ip_info(STATION_IF, &static_ip_info));
@@ -224,28 +211,12 @@ static void telnetTask(void *pvParameters)
 			}
 			case STATION_GOT_IP: {
 				debug("WiFi: Connected\n\r");
-//				/* Start SNTP */
-//				debug("Starting SNTP... ");
-//				/* SNTP will request an update each 5 minutes */
-//				sntp_set_update_delay(5*60000);
-//				/* Set GMT+1 zone, daylight savings off */
-//				const struct timezone tz = {2*60, 0};
-//				/* SNTP initialization */
-//				sntp_initialize(&tz);
-//				/* Servers must be configured right after initialization */
-//				sntp_set_servers(servers, sizeof(servers) / sizeof(char*));
-//				debug("DONE!\n");
 				break;
 			}
 		}
 	}
-	/* Print date and time each 5 seconds */
 	if (status == STATION_GOT_IP)
 		while (1) {
-//		vTaskDelayMs(5000);
-//		time_t ts = time(NULL);
-//		debug("TIME: %s", ctime(&ts));
-//		status = sdk_wifi_station_get_connect_status();
 
 		xQueueReceive(xQueue_events, &events, portMAX_DELAY); // Wait here an event on netconn
 
@@ -296,7 +267,6 @@ static void telnetTask(void *pvParameters)
 	}
 }
 
-// newlib_syscalls.c - newlib syscalls for ESP8266
 void user_init(void)
 {
     gpio_set_iomux_function(2, IOMUX_GPIO2_FUNC_UART1_TXD);
@@ -305,5 +275,5 @@ void user_init(void)
 
 	//Create a queue to store events on netconns
 	xQueue_events = xQueueCreate(EVENTS_QUEUE_SIZE, sizeof(netconn_events));
-    xTaskCreate(telnetTask, "telnetTask", 512, NULL, 2, NULL);
+    xTaskCreate(socketsTask, "socketsTask", 512, NULL, 2, NULL);
 }
