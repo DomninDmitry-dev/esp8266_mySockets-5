@@ -30,6 +30,8 @@
 #include <ssid_config.h>
 #include "espressif/user_interface.h"
 
+#include <TI_aes.h>
+
 #define CALLBACK_DEBUG
 
 #ifdef CALLBACK_DEBUG
@@ -44,6 +46,12 @@
 #define ECHO_PORT_1 50
 #define ECHO_PORT_2 100
 #define EVENTS_QUEUE_SIZE 100
+
+const int rele1 = 15;
+const int rele2 = 0;
+const int rele3 = 5;
+const int rele4 = 16;
+const int rele5 = 13;
 
 QueueHandle_t xQueue_events;
 typedef struct {
@@ -169,10 +177,16 @@ static void socketsTask(void *pvParameters)
 		.bssid_set = 0
 	};
 
+	gpio_enable(rele1, GPIO_OUTPUT);
+	gpio_enable(rele2, GPIO_OUTPUT);
+	gpio_enable(rele3, GPIO_OUTPUT);
+	gpio_enable(rele4, GPIO_OUTPUT);
+	gpio_enable(rele5, GPIO_OUTPUT);
+
 	set_tcp_server_netconn(&nc, ECHO_PORT_1, netCallback);
 	debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_1);
-	//set_tcp_server_netconn(&nc, ECHO_PORT_2, netCallback);
-	//debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_2);
+	set_tcp_server_netconn(&nc, ECHO_PORT_2, netCallback);
+	debug("Server netconn %u ready on port %u.\n",(uint32_t)nc, ECHO_PORT_2);
 
 	debug("ssid: %s\n", config.ssid);
 	debug("password: %s\n", config.password);
@@ -247,8 +261,59 @@ static void socketsTask(void *pvParameters)
 				case ERR_OK: { // data incoming ?
 					do {
 						netbuf_data(netbuf, (void*)&buffer, &len_buf);
-						netconn_write(events.nc, buffer, strlen(buffer), NETCONN_COPY);
-						debug("Client %u send: %s\n",(uint32_t)events.nc,buffer);
+						//netconn_write(events.nc, buffer, strlen(buffer), NETCONN_COPY);
+						debug("Client %u send: %s\n",(uint32_t)events.nc, buffer);
+						if (strstr(buffer, "releon1") != 0) {
+							gpio_write(rele1, 1);
+							netconn_write(events.nc, "Rele 1 on\n", strlen("Rele 1 on\n"), NETCONN_COPY);
+							debug("Rele 1 on");
+						} else if (strstr(buffer, "releoff1") != 0) {
+							gpio_write(rele1, 0);
+							netconn_write(events.nc, "Rele 1 off\n", strlen("Rele 1 off\n"), NETCONN_COPY);
+							debug("Rele 1 off");
+						} else if (strstr(buffer, "releon2") != 0) {
+							gpio_write(rele2, 1);
+							netconn_write(events.nc, "Rele 2 on\n", strlen("Rele 2 on\n"), NETCONN_COPY);
+							debug("Rele 2 on");
+						} else if (strstr(buffer, "releoff2") != 0) {
+							gpio_write(rele2, 0);
+							netconn_write(events.nc, "Rele 2 off\n", strlen("Rele 2 off\n"), NETCONN_COPY);
+							debug("Rele 2 off");
+						} else if (strstr(buffer, "releon3") != 0) {
+							gpio_write(rele3, 1);
+							netconn_write(events.nc, "Rele 3 on\n", strlen("Rele 3 on\n"), NETCONN_COPY);
+							debug("Rele 3 on");
+						} else if (strstr(buffer, "releoff3") != 0) {
+							gpio_write(rele3, 0);
+							netconn_write(events.nc, "Rele 3 off\n", strlen("Rele 3 off\n"), NETCONN_COPY);
+							debug("Rele 3 off");
+						} else if (strstr(buffer, "releon4") != 0) {
+							gpio_write(rele4, 1);
+							netconn_write(events.nc, "Rele 4 on\n", strlen("Rele 4 on\n"), NETCONN_COPY);
+							debug("Rele 4 on");
+						} else if (strstr(buffer, "releoff4") != 0) {
+							gpio_write(rele4, 0);
+							netconn_write(events.nc, "Rele 4 off\n", strlen("Rele 4 off\n"), NETCONN_COPY);
+							debug("Rele 4 off");
+						} else if (strstr(buffer, "releon5") != 0) {
+							gpio_write(rele5, 1);
+							netconn_write(events.nc, "Rele 5 on\n", strlen("Rele 5 on\n"), NETCONN_COPY);
+							debug("Rele 5 on");
+						} else if (strstr(buffer, "releoff5") != 0) {
+							gpio_write(rele5, 0);
+							netconn_write(events.nc, "Rele 5 off\n", strlen("Rele 5 off\n"), NETCONN_COPY);
+							debug("Rele 5 off");
+						} else if (strstr(buffer, "status") != 0) {
+							char str[50];
+							sprintf(str, "R1=%d, R2=%d, R3=%d, R4=%d, R5=%d\n",
+									gpio_read(rele1),
+									gpio_read(rele2),
+									gpio_read(rele3),
+									gpio_read(rele4),
+									gpio_read(rele5));
+							netconn_write(events.nc, str, strlen(str), NETCONN_COPY);
+							debug("%s", str);
+						}
 					}
 					while (netbuf_next(netbuf) >= 0);
 					netbuf_delete(netbuf);
