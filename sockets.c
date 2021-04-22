@@ -30,8 +30,6 @@
 #include <ssid_config.h>
 #include "espressif/user_interface.h"
 
-#include <TI_aes.h>
-
 #define CALLBACK_DEBUG
 
 #ifdef CALLBACK_DEBUG
